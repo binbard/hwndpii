@@ -1,4 +1,3 @@
-fastapi[all]
+flask
 presidio-analyzer
 presidio-anonymizer
-uvicorn

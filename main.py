@@ -1,26 +1,18 @@
-from fastapi import FastAPI, File, UploadFile, Form, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from flask import Flask, render_template, request, send_file, Response
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 import io
+import re
+from presidio_anonymizer.operators import Decrypt
 
-app = FastAPI()
-
-templates = Jinja2Templates(directory="templates")
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app = Flask(__name__)
 
 analyzer = AnalyzerEngine()
 anonymizer = AnonymizerEngine()
 
 
 def decrypt_content(text: str, key: str) -> str:
-    import re
-    from presidio_anonymizer.operators import Decrypt
-
     def find_base64_strings(text):
         base64_pattern = r'(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?'
         matches = re.findall(base64_pattern, text)
@@ -70,56 +62,58 @@ def anonymize_content(text: str, mode: str = 'default', key: str = None):
         return anonymized_result.text
 
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "active_tab": "text"
-    })
+@app.route('/')
+def index():
+    return render_template('index.html', active_tab='text')
 
 
-@app.post("/anonymize_text", response_class=HTMLResponse)
-async def anonymize_text(request: Request, text: str = Form(...), mode: str = Form('default'), key: str = Form(None)):
+@app.route('/anonymize_text', methods=['POST'])
+def anonymize_text():
+    text = request.form['text']
+    mode = request.form.get('mode', 'default')
+    key = request.form.get('key')
+
     try:
         anonymized_text = anonymize_content(text, mode, key)
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "anonymized_text": anonymized_text,
-            "input_text": text,
-            "mode": mode,
-            "key": key,
-            "active_tab": "text"
-        })
+        return render_template('index.html', 
+                               anonymized_text=anonymized_text, 
+                               input_text=text, 
+                               mode=mode, 
+                               key=key, 
+                               active_tab='text')
     except Exception as e:
         error_message = str(e)
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "input_text": text,
-            "mode": mode,
-            "key": key,
-            "error_message": error_message,
-            "active_tab": "text"
-        })
+        return render_template('index.html', 
+                               input_text=text, 
+                               mode=mode, 
+                               key=key, 
+                               error_message=error_message, 
+                               active_tab='text')
 
 
-@app.post("/anonymize_csv")
-async def anonymize_csv(request: Request, file: UploadFile = File(...), mode: str = Form('default'), key: str = Form(None)):
+@app.route('/anonymize_csv', methods=['POST'])
+def anonymize_csv():
+    file = request.files['file']
+    mode = request.form.get('mode', 'default')
+    key = request.form.get('key')
+
     try:
-        contents = await file.read()
-        csv_text = contents.decode('utf-8')
+        contents = file.read().decode('utf-8')
 
-        anonymized_text = anonymize_content(csv_text, mode, key)
+        anonymized_text = anonymize_content(contents, mode, key)
 
         output_io = io.StringIO(anonymized_text)
-        response = StreamingResponse(output_io, media_type="text/csv")
-        response.headers["Content-Disposition"] = f"attachment; filename=processed_{file.filename}"
-        return response
+        return Response(output_io.getvalue(), mimetype='text/csv', headers={
+            "Content-Disposition": f"attachment;filename=processed_{file.filename}"
+        })
     except Exception as e:
         error_message = str(e)
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error_message": error_message,
-            "mode": mode,
-            "key": key,
-            "active_tab": "csv"
-        })
+        return render_template('index.html', 
+                               error_message=error_message, 
+                               mode=mode, 
+                               key=key, 
+                               active_tab='csv')
+
+
+if __name__ == '__main__':
+    app.run(port=8082, host='0.0.0.0')
