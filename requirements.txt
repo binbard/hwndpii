@@ -1,0 +1,4 @@
+fastapi
+presidio-analyzer
+presidio-anonymizer
+uvicorn
