@@ -1,0 +1,26 @@
+body {
+    background-color: #f8f9fa;
+}
+
+h1 {
+    margin-bottom: 20px;
+}
+
+pre {
+    background-color: #e9ecef;
+    padding: 15px;
+    border-radius: 5px;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #ffffff;
+    border-color: #dee2e6 #dee2e6 #ffffff;
+}
+
+#loading {
+    margin-top: 20px;
+}
+
+.alert {
+    margin-top: 20px;
+}
