@@ -83,6 +83,8 @@ def anonymize_text():
                                active_tab='text')
     except Exception as e:
         error_message = str(e)
+        if error_message == "Invalid input, key must be of length 128, 192 or 256 bits":
+            error_message = "Invalid input, key must be of length 16, 24 or 32 characters"
         return render_template('index.html', 
                                input_text=text, 
                                mode=mode, 
