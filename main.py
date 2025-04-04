@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, Response
+from flask import Flask, jsonify, render_template, request, send_file, Response
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
@@ -116,6 +116,61 @@ def anonymize_csv():
                                key=key, 
                                active_tab='csv')
 
+
+@app.route('/api/anonymize_text', methods=['POST'])
+def api_anonymize_text():
+    # Support for JSON
+    if request.is_json:
+        data = request.get_json()
+        text = data.get('text', '')
+        mode = data.get('mode', 'default')
+        key = data.get('key')
+    else:
+        # Support for form data 
+        text = request.form.get('text', '')
+        mode = request.form.get('mode', 'default')
+        key = request.form.get('key')
+    
+    try:
+        anonymized_text = anonymize_content(text, mode, key)
+        return jsonify({
+            'status': 'success',
+            'anonymized_text': anonymized_text
+        })
+    except Exception as e:
+        error_message = str(e)
+        if error_message == "Invalid input, key must be of length 128, 192 or 256 bits":
+            error_message = "Invalid input, key must be of length 16, 24 or 32 characters"
+        return jsonify({
+            'status': 'error',
+            'error': error_message
+        }), 400
+
+@app.route('/api/anonymize_csv', methods=['POST'])
+def api_anonymize_csv():
+    file = request.files['file']
+    mode = request.form.get('mode', 'default')
+    key = request.form.get('key')
+
+    try:
+        contents = file.read().decode('utf-8')
+
+        anonymized_text = anonymize_content(contents, mode, key)
+
+        output_io = io.StringIO(anonymized_text)
+        return Response(output_io.getvalue(), mimetype='text/csv', headers={
+            "Content-Disposition": f"attachment;filename=processed_{file.filename}"
+        })
+    except Exception as e:
+        error_message = str(e)
+        return jsonify({
+            'status': 'error',
+            'error': error_message
+        }), 400
+
+@app.route('/api/docs')
+def api_docs():
+    return render_template('api_docs.html')
 
 if __name__ == '__main__':
     app.run(port=8082, host='0.0.0.0')
